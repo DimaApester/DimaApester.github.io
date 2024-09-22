@@ -90,7 +90,6 @@
   }
 
   function fetchAdsTxt(domain) {
-    console.log(`Fetching ads.txt for domain: https://${domain}/ads.txt`);
     return fetch(`https://${domain}/ads.txt`)
       .then(response => response.ok ? response.text() : null)
       .catch(() => null);
