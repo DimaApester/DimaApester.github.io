@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CSV Ads.txt Checker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid black;
+    }
+    th, td {
+      padding: 10px;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+
+<h1>CSV Ads.txt Checker</h1>
+
+<label for="domainFile">Upload Domains CSV:</label>
+<input type="file" id="domainFile" accept=".csv"><br><br>
+
+<label for="shortListFile">Upload Short List CSV:</label>
+<input type="file" id="shortListFile" accept=".csv"><br><br>
+
+<button id="processButton">Process CSVs</button>
+
+<h2>Results</h2>
+<table id="resultTable">
+  <thead>
+    <tr>
+      <th>Domain</th>
+      <th>Missing Entries</th>
+    </tr>
+  </thead>
+  <tbody>
+  </tbody>
+</table>
+
+<script>
+  document.getElementById('processButton').addEventListener('click', function() {
+    const domainFile = document.getElementById('domainFile').files[0];
+    const shortListFile = document.getElementById('shortListFile').files[0];
+
+    if (domainFile && shortListFile) {
+      Promise.all([readCSV(domainFile), readCSV(shortListFile)])
+        .then(([domainList, shortList]) => {
+          processCSVData(domainList, shortList);
+        })
+        .catch(error => console.error('Error reading CSV files:', error));
+    } else {
+      alert('Please upload both CSV files.');
+    }
+  });
+
+  function readCSV(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        const rows = event.target.result.split('\n').map(row => row.trim());
+        resolve(rows);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  }
+
+  async function processCSVData(domainList, shortList) {
+    const resultTableBody = document.querySelector('#resultTable tbody');
+    resultTableBody.innerHTML = ''; // Clear previous results
+
+    for (const domain of domainList) {
+      const adsTxtContent = await fetchAdsTxt(domain);
+      if (adsTxtContent) {
+        const missingEntries = findMissingEntries(adsTxtContent, shortList);
+        displayResult(domain, missingEntries);
+      } else {
+        displayResult(domain, ['Failed to fetch ads.txt']);
+      }
+    }
+  }
+
+  function fetchAdsTxt(domain) {
+    console.log(`Fetching ads.txt for domain: https://${domain}/ads.txt`);
+    return fetch(`https://${domain}/ads.txt`)
+      .then(response => response.ok ? response.text() : null)
+      .catch(() => null);
+  }
+
+  function findMissingEntries(adsTxtContent, shortList) {
+    const adsTxtLines = adsTxtContent.split('\n').map(line => line.trim());
+    return shortList.filter(item => !adsTxtLines.includes(item));
+  }
+
+  function displayResult(domain, missingEntries) {
+    const resultTableBody = document.querySelector('#resultTable tbody');
+    const row = document.createElement('tr');
+    const domainCell = document.createElement('td');
+    const missingCell = document.createElement('td');
+
+    domainCell.textContent = domain;
+    missingCell.textContent = missingEntries.length > 0 ? missingEntries.join(', ') : 'No missing entries';
+
+    row.appendChild(domainCell);
+    row.appendChild(missingCell);
+    resultTableBody.appendChild(row);
+  }
+</script>
+
+</body>
+</html>
